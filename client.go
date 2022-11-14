@@ -51,6 +51,24 @@ type Order struct {
 	CreatorId     string `json:"creatorId"`
 	Timestamp     int64  `json:"timestamp"`
 }
+type Ticker struct {
+	Symbol          string `json:"symbol"`
+	BaseCurrency    string `json:"baseCurrency"`
+	QuoteCurrency   string `json:"quoteCurrency"`
+	Volume24H       string `json:"volume24h"`
+	Volume7D        string `json:"volume7d"`
+	Change24H       string `json:"change24h"`
+	Change7D        string `json:"change7d"`
+	Amount24H       string `json:"amount24h"`
+	Amount7D        string `json:"amount7d"`
+	LastPrice       string `json:"lastPrice"`
+	LastQuantity    string `json:"lastQuantity"`
+	BestBid         string `json:"bestBid"`
+	BestBidQuantity string `json:"bestBidQuantity"`
+	BestAsk         string `json:"bestAsk"`
+	BestAskQuantity string `json:"bestAskQuantity"`
+	UpdateTimestamp int64  `json:"updateTimestamp"`
+}
 
 type OrderBook struct {
 	Ask []struct {
@@ -230,7 +248,7 @@ func (lc *LatokenClient) CancelAllOrders() error {
 	return nil
 }
 
-func (lc *LatokenClient) CancelAllOrdersInSymbol(base string, quote string) error {
+func (lc *LatokenClient) CancelAllOrdersInSymbol(base, quote string) error {
 	endpoint := "/v2/auth/order/cancelAll" + "/" + base + "/" + quote
 	req, err := lc.makeSignedRequest(http.MethodPost, endpoint, "", "", nil)
 	if err != nil {
@@ -357,7 +375,7 @@ func (lc *LatokenClient) GetAllMyOrders(from int64, limit int) ([]Order, error) 
 	return nil, apiErr
 }
 
-func (lc *LatokenClient) GetOrderBook(base string, quote string, limit int) (*OrderBook, error) {
+func (lc *LatokenClient) GetOrderBook(base, quote string, limit int) (*OrderBook, error) {
 	endpoint := "/v2/book" + "/" + base + "/" + quote
 	req, err := http.NewRequest(http.MethodGet, baseAPIMainURL+endpoint+"?"+fmt.Sprintf("limit=%d", limit), nil)
 	if err != nil {
@@ -382,6 +400,46 @@ func (lc *LatokenClient) GetOrderBook(base string, quote string, limit int) (*Or
 	}
 	if resp.StatusCode < 400 {
 		var res OrderBook
+		err = json.Unmarshal(data, &res)
+		if err != nil {
+			return nil, err
+		}
+		return &res, nil
+	}
+
+	var apiErr APIError
+	err = json.Unmarshal(data, &apiErr)
+	if err != nil {
+		return nil, err
+	}
+	return nil, apiErr
+}
+
+func (lc *LatokenClient) GetTicker(base, quote string) (*Ticker, error) {
+	endpoint := "/v2/ticker/" + base + "/" + quote
+	req, err := http.NewRequest(http.MethodGet, baseAPIMainURL+endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := lc.HttpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if resp.Body == nil {
+			return
+		}
+		err2 := resp.Body.Close()
+		if err == nil && err2 != nil {
+			err = err2
+		}
+	}()
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 400 {
+		var res Ticker
 		err = json.Unmarshal(data, &res)
 		if err != nil {
 			return nil, err

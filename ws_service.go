@@ -23,6 +23,11 @@ type WSOrderAns struct {
 	Timestamp int64           `json:"timestamp"`
 }
 
+type Rate struct {
+	Symbol string  `json:"symbol"`
+	Rate   float64 `json:"rate"`
+}
+
 type WsOrderUpdate struct {
 	Id            string `json:"id"`
 	User          string `json:"user"`
@@ -126,6 +131,110 @@ func (lc *LatokenClient) GetOrdersChan() (chan *WsOrderUpdate, chan struct{}, ch
 	}()
 
 	return wsOrderUpdateChan, stopC, doneC, nil
+}
+
+func (lc *LatokenClient) GetRate(base, quote string) (chan *Rate, chan struct{}, chan struct{}, error) {
+	endPoint := "/v1/rate/" + base + "/" + quote
+	fmt.Println(endPoint)
+	//endPoint := "/v1/ticker"
+	c, _, err := websocket.DefaultDialer.Dial(WSUrl, nil)
+	c.SetReadLimit(6555350)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	//signatureTime := strconv.FormatInt(time.Now().UnixMilli(), 10)
+	//signature := GetSignature(lc.SecretKey, []byte(signatureTime))
+
+	a := stompws.Message{
+		Command: "CONNECT",
+		Headers: stompws.Headers{
+			stompws.HK_ACCEPT_VERSION, "1.2",
+			stompws.HK_HEART_BEAT, "1000,1000",
+			stompws.HK_HOST, WSUrl,
+		},
+	}
+	err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s\n%s\n\x00\n", a.Command, a.Headers.String())))
+	if err != nil {
+		fmt.Println(err)
+	}
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	_, mes, err := c.ReadMessage()
+	fmt.Println(string(mes))
+	if err != nil {
+		fmt.Printf("gettickerschan: can't read message`: %v\n", err)
+	}
+	//go keepAlive(c, 1*time.Second)
+	//err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nack:auto\n\n\x00\n", 1, endPoint)))
+	err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nsubscription:4\nack:auto\n\n\x00\n", 0, endPoint)))
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	wsTickerChan := make(chan *Rate, 100)
+	stopC := make(chan struct{})
+	doneC := make(chan struct{})
+	go func() {
+		select {
+		case <-stopC:
+			fmt.Println("got signal")
+			/*err = c.Close()
+			if err != nil {
+				fmt.Printf("gettickerchan: can't close channel: %v\n", err)
+			}*/
+			doneC <- struct{}{}
+		}
+		return
+	}()
+
+	go func() {
+		for {
+
+			_, message, err := c.ReadMessage()
+			if err != nil {
+				fmt.Println(err)
+			}
+			if err != nil {
+				log.Printf("gettickerchan: can't read message`: %v\n", err)
+				stopC <- struct{}{}
+				fmt.Println("sent signal")
+				break
+			}
+			fmt.Println(string(message))
+			if len(message) < 2 {
+				//deadline := time.Now().Add(1 * time.Second)
+				//err := c.WriteControl(websocket.PongMessage, []byte("10"), deadline)
+				//err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nsubscription:4\nack:auto\n\n\x00\n", 0, endPoint)))
+				if err != nil {
+					log.Printf("control err: %v\n", err)
+				}
+				//fmt.Println("here")
+				fmt.Println(message)
+				continue
+			}
+			for idx, r := range message {
+				if r == '{' {
+					message = message[idx : len(message)-1]
+					break
+				}
+			}
+			//fmt.Println(string(message))
+			var ans struct {
+				Payload   []*Rate `json:"payload,omitempty"`
+				Nonce     int     `json:"nonce,omitempty"`
+				Timestamp int64   `json:"timestamp"`
+			}
+			err = json.Unmarshal(message, &ans)
+			if err != nil {
+				log.Printf("gettickerchan: can't unmarshal message %s: %v\n", message, err)
+				continue
+			}
+			wsTickerChan <- ans.Payload[0]
+		}
+		return
+	}()
+	return wsTickerChan, stopC, doneC, nil
 }
 
 func keepAlive(c *websocket.Conn, timeout time.Duration) {

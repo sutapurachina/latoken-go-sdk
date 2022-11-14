@@ -83,3 +83,14 @@ func TestLatokenClient_GetOrderBook(t *testing.T) {
 		fmt.Println(res)
 	}
 }
+
+func TestLatokenClient_GetTicker(t *testing.T) {
+	latokenClient := NewDefaultLatokenClient(APIKey, SecretKey)
+	res, err := latokenClient.GetTicker("ETH", "USDT")
+	assert.NoError(t, err, "expected successfully get orders")
+
+	if res != nil {
+		fmt.Println(res.BestAsk)
+		fmt.Println(res.BestBid)
+	}
+}
