@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -190,16 +191,18 @@ func (lc *LatokenClient) GetRate(base, quote string) (chan *Rate, chan struct{},
 
 	go func() {
 		for {
-
 			_, message, err := c.ReadMessage()
 			if err != nil {
 				fmt.Println(err)
 			}
 			if err != nil {
 				log.Printf("gettickerchan: can't read message`: %v\n", err)
-				stopC <- struct{}{}
-				fmt.Println("sent signal")
-				break
+				if strings.Contains(err.Error(), "clos") {
+					stopC <- struct{}{}
+					fmt.Println("sent signal")
+					break
+				}
+				continue
 			}
 			fmt.Println(string(message))
 			if len(message) < 2 {
