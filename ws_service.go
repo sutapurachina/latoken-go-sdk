@@ -52,16 +52,16 @@ type WsOrderUpdate struct {
 	CreatorId     string `json:"creatorId"`
 }
 
-func (lc *LatokenClient) GetOrdersChan() (chan *WsOrderUpdate, chan struct{}, chan struct{}, error) {
+func (lc *LatokenClient) GetOrdersChan(orderC chan *WsOrderUpdate) (chan struct{}, chan struct{}, error) {
 	info, err := lc.GetUserInfo()
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	endPoint := "/user/" + info.Id + "/v1/order"
 	c, _, err := websocket.DefaultDialer.Dial(WSUrl, nil)
 	c.SetReadLimit(650000)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	signatureTime := strconv.FormatInt(time.Now().UnixMilli(), 10)
@@ -78,7 +78,7 @@ func (lc *LatokenClient) GetOrdersChan() (chan *WsOrderUpdate, chan struct{}, ch
 	}
 	err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s\n%s\n\x00\n", a.Command, a.Headers.String())))
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	_, _, err = c.ReadMessage()
 	if err != nil {
@@ -87,13 +87,12 @@ func (lc *LatokenClient) GetOrdersChan() (chan *WsOrderUpdate, chan struct{}, ch
 	go keepAlive(c, 10*time.Second)
 	err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nack:auto\n\n\x00\n", 0, endPoint)))
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	_, _, err = c.ReadMessage()
 	if err != nil {
 		fmt.Printf("getorderschan: can't read message`: %v\n", err)
 	}
-	wsOrderUpdateChan := make(chan *WsOrderUpdate, 100)
 	stopC := make(chan struct{})
 	doneC := make(chan struct{})
 	go func() {
@@ -112,6 +111,10 @@ func (lc *LatokenClient) GetOrdersChan() (chan *WsOrderUpdate, chan struct{}, ch
 			_, message, err := c.ReadMessage()
 			if err != nil {
 				log.Printf("getorderschan: can't read message`: %v\n", err)
+				if strings.Contains(err.Error(), "clos") {
+					break
+				}
+				continue
 			}
 			for idx, r := range message {
 				if r == '{' {
@@ -126,22 +129,22 @@ func (lc *LatokenClient) GetOrdersChan() (chan *WsOrderUpdate, chan struct{}, ch
 				continue
 			}
 			for _, update := range ans.Payload {
-				wsOrderUpdateChan <- &update
+				orderC <- &update
 			}
 		}
 	}()
 
-	return wsOrderUpdateChan, stopC, doneC, nil
+	return stopC, doneC, nil
 }
 
-func (lc *LatokenClient) GetRate(base, quote string) (chan *Rate, chan struct{}, chan struct{}, error) {
+func (lc *LatokenClient) GetRate(base, quote string, update chan *Rate) (chan struct{}, chan struct{}, error) {
 	endPoint := "/v1/rate/" + base + "/" + quote
 	fmt.Println(endPoint)
 	//endPoint := "/v1/ticker"
 	c, _, err := websocket.DefaultDialer.Dial(WSUrl, nil)
 	c.SetReadLimit(6555350)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	//signatureTime := strconv.FormatInt(time.Now().UnixMilli(), 10)
@@ -160,7 +163,7 @@ func (lc *LatokenClient) GetRate(base, quote string) (chan *Rate, chan struct{},
 		fmt.Println(err)
 	}
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	_, mes, err := c.ReadMessage()
 	fmt.Println(string(mes))
@@ -171,9 +174,8 @@ func (lc *LatokenClient) GetRate(base, quote string) (chan *Rate, chan struct{},
 	//err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nack:auto\n\n\x00\n", 1, endPoint)))
 	err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nsubscription:4\nack:auto\n\n\x00\n", 0, endPoint)))
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
-	wsTickerChan := make(chan *Rate, 100)
 	stopC := make(chan struct{})
 	doneC := make(chan struct{})
 	go func() {
@@ -233,11 +235,11 @@ func (lc *LatokenClient) GetRate(base, quote string) (chan *Rate, chan struct{},
 				log.Printf("gettickerchan: can't unmarshal message %s: %v\n", message, err)
 				continue
 			}
-			wsTickerChan <- ans.Payload[0]
+			update <- ans.Payload[0]
 		}
 		return
 	}()
-	return wsTickerChan, stopC, doneC, nil
+	return stopC, doneC, nil
 }
 
 func keepAlive(c *websocket.Conn, timeout time.Duration) {

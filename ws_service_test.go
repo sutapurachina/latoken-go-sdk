@@ -7,23 +7,23 @@ import (
 
 func TestLatokenClient_GetOrdersChan(t *testing.T) {
 	latokenClient := NewDefaultLatokenClient(APIKey, SecretKey)
-
-	update, _, _, err := latokenClient.GetOrdersChan()
+	orderC := make(chan *WsOrderUpdate, 100)
+	_, _, err := latokenClient.GetOrdersChan(orderC)
 
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	for {
-		a := <-update
+		a := <-orderC
 		fmt.Printf("aaa: %v\n", *a)
 	}
 }
 
 func TestLatokenClient_GetRate(t *testing.T) {
 	latokenClient := NewDefaultLatokenClient(APIKey, SecretKey)
-
-	update, _, doneC, err := latokenClient.GetRate("BTC", "USDT")
+	update := make(chan *Rate, 100)
+	_, doneC, err := latokenClient.GetRate("BTC", "USDT", update)
 
 	if err != nil {
 		fmt.Println(err)
