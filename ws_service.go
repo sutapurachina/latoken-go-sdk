@@ -168,16 +168,18 @@ func (lc *LatokenClient) GetRate(base, quote string, update chan *Rate) (chan st
 	_, mes, err := c.ReadMessage()
 	fmt.Println(string(mes))
 	if err != nil {
-		fmt.Printf("gettickerschan: can't read message`: %v\n", err)
+		fmt.Printf("gettickerschan: can't read message1`: %v\n", err)
 	}
-	//go keepAlive(c, 1*time.Second)
+	keepAlive(c, 500*time.Millisecond)
+	//go keepAlive(c, 10*time.Second)
 	//err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nack:auto\n\n\x00\n", 1, endPoint)))
-	err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nsubscription:4\nack:auto\n\n\x00\n", 0, endPoint)))
+	err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nsubscription:4\nack:client\n\n\x00\n", 0, endPoint)))
 	if err != nil {
 		return nil, nil, err
 	}
 	stopC := make(chan struct{})
 	doneC := make(chan struct{})
+	//lastResponse := time.Now()
 	go func() {
 		select {
 		case <-stopC:
@@ -187,8 +189,9 @@ func (lc *LatokenClient) GetRate(base, quote string, update chan *Rate) (chan st
 				fmt.Printf("gettickerchan: can't close channel: %v\n", err)
 			}*/
 			doneC <- struct{}{}
+			return
+
 		}
-		return
 	}()
 
 	go func() {
@@ -198,7 +201,10 @@ func (lc *LatokenClient) GetRate(base, quote string, update chan *Rate) (chan st
 				fmt.Println(err)
 			}
 			if err != nil {
-				log.Printf("gettickerchan: can't read message`: %v\n", err)
+				log.Printf("gettickerchan: can't read message2`: %v\n", err)
+				if strings.Contains(err.Error(), "use of closed network connection") {
+					continue
+				}
 				if strings.Contains(err.Error(), "clos") {
 					stopC <- struct{}{}
 					fmt.Println("sent signal")
@@ -208,16 +214,20 @@ func (lc *LatokenClient) GetRate(base, quote string, update chan *Rate) (chan st
 			}
 			fmt.Println(string(message))
 			if len(message) < 2 {
-				//deadline := time.Now().Add(1 * time.Second)
-				//err := c.WriteControl(websocket.PongMessage, []byte("10"), deadline)
-				//err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nsubscription:4\nack:auto\n\n\x00\n", 0, endPoint)))
-				if err != nil {
-					log.Printf("control err: %v\n", err)
-				}
-				//fmt.Println("here")
-				fmt.Println(message)
+				//deadline := time.Now().Add(2 * time.Second)
+				//err := c.WriteControl(websocket.PingMessage, []byte("send data"), deadline)
+				fmt.Println("here")
+				//fmt.Println(message)
+				//if lastResponse.UnixMilli()-time.Now().UnixMilli() < -750 {
+				//	err = c.WriteMessage(websocket.TextMessage, []byte("9"))
+				//	if err != nil {
+				//		log.Printf("control err: %v\n", err)
+				//	}
+				//	lastResponse = time.Now()
+				//}
 				continue
 			}
+			fmt.Printf("MY MES: %s\n", string(message))
 			for idx, r := range message {
 				if r == '{' {
 					message = message[idx : len(message)-1]
@@ -242,7 +252,7 @@ func (lc *LatokenClient) GetRate(base, quote string, update chan *Rate) (chan st
 	return stopC, doneC, nil
 }
 
-func keepAlive(c *websocket.Conn, timeout time.Duration) {
+/*func keepAlive(c *websocket.Conn, timeout time.Duration) {
 	ticker := time.NewTicker(timeout)
 
 	lastResponse := time.Now()
@@ -262,6 +272,24 @@ func keepAlive(c *websocket.Conn, timeout time.Duration) {
 			<-ticker.C
 			if time.Since(lastResponse) > timeout {
 				_ = c.Close()
+				return
+			}
+		}
+	}()
+}*/
+
+func keepAlive(c *websocket.Conn, timeout time.Duration) {
+	ticker := time.NewTicker(timeout)
+	/*c.SetPongHandler(func(msg string) error {
+		lastResponse = time.Now()
+		return nil
+	})*/
+
+	go func() {
+		defer ticker.Stop()
+		for range ticker.C {
+			err := c.WriteMessage(websocket.TextMessage, []byte("\n"))
+			if err != nil {
 				return
 			}
 		}

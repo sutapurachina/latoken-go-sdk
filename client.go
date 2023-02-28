@@ -204,8 +204,8 @@ func (lc *LatokenClient) CancelOrder(id string) error {
 	return nil
 }
 
-func (lc *LatokenClient) CancelAllOrders() error {
-	endpoint := "/v2/auth/order/cancelAll"
+func (lc *LatokenClient) CancelAllOrdersInPair(base, quote string) error {
+	endpoint := "/v2/auth/order/cancelAll" + "/" + base + "/" + quote
 	req, err := lc.makeSignedRequest(http.MethodPost, endpoint, "", "", nil)
 	if err != nil {
 		return err

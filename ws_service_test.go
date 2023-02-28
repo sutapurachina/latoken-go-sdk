@@ -31,13 +31,12 @@ func TestLatokenClient_GetRate(t *testing.T) {
 	}
 	for {
 		select {
-		case <-update:
+		case a := <-update:
 			fmt.Println("got update")
-			//fmt.Printf("aaa: %v\n", *a)
+			fmt.Printf("aaa: %v\n", *a)
 		case <-doneC:
 			fmt.Println("closed")
 			return
 		}
 	}
-	return
 }

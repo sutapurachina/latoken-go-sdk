@@ -44,7 +44,7 @@ func TestLatokenClient_CancelAllOrders(t *testing.T) {
 		SetPrice("2500").
 		SetQuantity("0.001").Do()
 	assert.NoError(t, err, "expected successfully create order")
-	err = latokenClient.CancelAllOrders()
+	err = latokenClient.CancelAllOrdersInPair("ETH", "USDT")
 	assert.NoError(t, err, "expected successfully cancel order")
 }
 

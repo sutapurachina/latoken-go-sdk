@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	APIKey    = "fad02b9a-6c82-4dae-93f7-1596a3098242"
-	SecretKey = "Y2Q3ZDA4MDgtNzA2ZC00MjJiLWI3NjMtMjkwYmNjNzcwNDRl"
+	APIKey    = "bc6eb3ed-0a32-4f19-8e56-e2359a209492"
+	SecretKey = "YmQyZTRhNWItZWE0Ni00N2Q0LTg4MmYtYjlkMTk5MDQ1ZGE5"
 )
 
 func TestCreateOrderService_Do(t *testing.T) {
