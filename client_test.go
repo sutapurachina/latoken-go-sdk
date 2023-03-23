@@ -94,3 +94,13 @@ func TestLatokenClient_GetTicker(t *testing.T) {
 		fmt.Println(res.BestBid)
 	}
 }
+
+func TestLatokenClient_GetOrder(t *testing.T) {
+	latokenClient := NewDefaultLatokenClient(APIKey, SecretKey)
+	res, err := latokenClient.GetOrder("8e70a965-ca3a-4279-b007-b71141da0d90")
+	assert.NoError(t, err, "expected successfully get orders")
+
+	if res != nil {
+		fmt.Println(res)
+	}
+}

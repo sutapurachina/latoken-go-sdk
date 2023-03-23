@@ -137,12 +137,14 @@ func (lc *LatokenClient) GetOrdersChan(orderC chan *WsOrderUpdate) (chan struct{
 	return stopC, doneC, nil
 }
 
+// 0c3a106d-bde3-4c13-a26e-3fd2394529e --usdt
+// 92151d82-df98-4d88-9a4d-284fa9eca49f --btc
 func (lc *LatokenClient) GetRate(base, quote string, update chan *Rate) (chan struct{}, chan struct{}, error) {
 	endPoint := "/v1/rate/" + base + "/" + quote
 	fmt.Println(endPoint)
 	//endPoint := "/v1/ticker"
 	c, _, err := websocket.DefaultDialer.Dial(WSUrl, nil)
-	c.SetReadLimit(6555350)
+	c.SetReadLimit(655535000000)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -153,9 +155,9 @@ func (lc *LatokenClient) GetRate(base, quote string, update chan *Rate) (chan st
 	a := stompws.Message{
 		Command: "CONNECT",
 		Headers: stompws.Headers{
-			stompws.HK_ACCEPT_VERSION, "1.2",
-			stompws.HK_HEART_BEAT, "1000,1000",
-			stompws.HK_HOST, WSUrl,
+			stompws.HK_ACCEPT_VERSION, "1.1",
+			stompws.HK_HEART_BEAT, "0,0",
+			//stompws.HK_HOST, WSUrl,
 		},
 	}
 	err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s\n%s\n\x00\n", a.Command, a.Headers.String())))
@@ -170,10 +172,10 @@ func (lc *LatokenClient) GetRate(base, quote string, update chan *Rate) (chan st
 	if err != nil {
 		fmt.Printf("gettickerschan: can't read message1`: %v\n", err)
 	}
-	keepAlive(c, 500*time.Millisecond)
+	//keepAlive(c, 500*time.Millisecond)
 	//go keepAlive(c, 10*time.Second)
 	//err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nack:auto\n\n\x00\n", 1, endPoint)))
-	err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nsubscription:4\nack:client\n\n\x00\n", 0, endPoint)))
+	err = c.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("SUBSCRIBE\nid:%d\ndestination:%s\nack:auto\n\n\x00\n", 0, endPoint)))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -190,13 +192,13 @@ func (lc *LatokenClient) GetRate(base, quote string, update chan *Rate) (chan st
 			}*/
 			doneC <- struct{}{}
 			return
-
 		}
 	}()
-
 	go func() {
 		for {
+			fmt.Println("waiting")
 			_, message, err := c.ReadMessage()
+			fmt.Println("got it")
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -235,17 +237,17 @@ func (lc *LatokenClient) GetRate(base, quote string, update chan *Rate) (chan st
 				}
 			}
 			//fmt.Println(string(message))
-			var ans struct {
-				Payload   []*Rate `json:"payload,omitempty"`
-				Nonce     int     `json:"nonce,omitempty"`
-				Timestamp int64   `json:"timestamp"`
-			}
-			err = json.Unmarshal(message, &ans)
+			//var ans struct {
+			//	Payload   []*Rate `json:"payload,omitempty"`
+			//	Nonce     int     `json:"nonce,omitempty"`
+			//	Timestamp int64   `json:"timestamp"`
+			//}
+			//err = json.Unmarshal(message, &ans)
 			if err != nil {
 				log.Printf("gettickerchan: can't unmarshal message %s: %v\n", message, err)
 				continue
 			}
-			update <- ans.Payload[0]
+			//update <- ans.Payload[0]
 		}
 		return
 	}()

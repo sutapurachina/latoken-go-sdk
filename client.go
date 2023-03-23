@@ -454,3 +454,45 @@ func (lc *LatokenClient) GetTicker(base, quote string) (*Ticker, error) {
 	}
 	return nil, apiErr
 }
+
+func (lc *LatokenClient) GetOrder(id string) (*Order, error) {
+	endpoint := "/v2/auth/order/getOrder/" + id
+	req, err := lc.makeSignedRequest(http.MethodGet, endpoint, "", "", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := lc.HttpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if resp.Body == nil {
+			return
+		}
+		err2 := resp.Body.Close()
+		if err == nil && err2 != nil {
+			err = err2
+		}
+	}()
+	fmt.Println(resp)
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 400 {
+		var res Order
+		err = json.Unmarshal(data, &res)
+		if err != nil {
+			return nil, err
+		}
+		return &res, nil
+	}
+
+	var apiErr APIError
+	err = json.Unmarshal(data, &apiErr)
+	if err != nil {
+		return nil, err
+	}
+	return nil, apiErr
+}
